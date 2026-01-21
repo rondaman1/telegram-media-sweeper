@@ -46,9 +46,6 @@ async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text="✅ I’m online and watching for photos/videos."
     )
 async def on_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Fires for member status changes. We'll treat "joined/added" as a join.
-    """
     cu = update.chat_member
     if not cu:
         return
@@ -56,11 +53,9 @@ async def on_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = cu.chat.id
     new_user = cu.new_chat_member.user
 
-    # Ignore bots
     if new_user.is_bot:
         return
 
-    # Detect join/add: status became member/administrator from left/kicked
     old_status = cu.old_chat_member.status
     new_status = cu.new_chat_member.status
 
@@ -68,8 +63,18 @@ async def on_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not joined:
         return
 
+
     c.execute(
-        "INSERT OR REPLACE INTO users VALUES (?,?,?,?,0,0)",
+        """
+        INSERT INTO users (chat_id, user_id, joined_at, last_media_at, warned_2h, warned_10m)
+        VALUES (?,?,?,?,0,0)
+        ON CONFLICT(chat_id, user_id)
+        DO UPDATE SET
+            joined_at=excluded.joined_at,
+            last_media_at=NULL,
+            warned_2h=0,
+            warned_10m=0
+        """,
         (chat_id, new_user.id, now().isoformat(), None)
     )
     conn.commit()
