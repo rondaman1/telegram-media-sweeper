@@ -11,7 +11,7 @@ from telegram.ext import (
     filters,
 )
 
-TOKEN = "8515071987:AAHdbbOUYlVKvXlm9MVxjW5j6eyHa_Rotes"
+TOKEN = "8515071987:AAHCy16_lskoL_rt8TicmTDuILi9c6ybnl0"
 
 GRACE_HOURS = 24
 MEDIA_DAYS = 7
