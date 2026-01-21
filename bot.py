@@ -22,17 +22,19 @@ WARN_10M = 10
 
 conn = sqlite3.connect("activity.db", check_same_thread=False)
 c = conn.cursor()
-c.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    chat_id INTEGER,
-    user_id INTEGER,
-    joined_at TEXT,
-    last_media_at TEXT,
-    warned_2h INTEGER DEFAULT 0,
-    warned_10m INTEGER DEFAULT 0,
-    PRIMARY KEY (chat_id, user_id)
+c.execute(
+    """
+    INSERT INTO users (chat_id, user_id, joined_at, last_media_at, warned_2h, warned_10m)
+    VALUES (?,?,?,?,0,0)
+    ON CONFLICT(chat_id, user_id)
+    DO UPDATE SET
+        joined_at=excluded.joined_at,
+        last_media_at=NULL,
+        warned_2h=0,
+        warned_10m=0
+    """,
+    (chat_id, new_user.id, now().isoformat(), None)
 )
-""")
 conn.commit()
 
 def now():
