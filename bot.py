@@ -140,24 +140,18 @@ async def sweep(context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
 
-async def main():
-    app = ApplicationBuilder().token(TOKEN).build()
+    def main():
+        app = ApplicationBuilder().token(TOKEN).build()
 
-    # A simple test command
-    app.add_handler(CommandHandler("ping", ping))
+        app.add_handler(CommandHandler("ping", ping))
+        app.add_handler(ChatMemberHandler(on_member_update, ChatMemberHandler.CHAT_MEMBER))
+        app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO, on_media))
 
-    # Member updates (joins/leaves)
-    app.add_handler(ChatMemberHandler(on_member_update, ChatMemberHandler.CHAT_MEMBER))
+        # Run checks every 5 minutes
+        app.job_queue.run_repeating(sweep, interval=300)
 
-    # Media tracking
-    app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO, on_media))
+        # IMPORTANT: run_polling is NOT awaited
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
 
-    # Run checks every 5 minutes
-    app.job_queue.run_repeating(sweep, interval=300)
-    
-    # Make sure we receive member updates too
-    await app.run_polling(allowed_updates=Update.ALL_TYPES)
-
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    if __name__ == "__main__":
+        main()
