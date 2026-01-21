@@ -154,10 +154,7 @@ async def main():
 
     # Run checks every 5 minutes
     app.job_queue.run_repeating(sweep, interval=300)
-await app.bot.send_message(
-    chat_id=2137312176
-    text="🟢 Sweeperrr bot is ONLINE and connected to Telegram."
-)
+    
     # Make sure we receive member updates too
     await app.run_polling(allowed_updates=Update.ALL_TYPES)
 
