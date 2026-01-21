@@ -100,58 +100,25 @@ async def sweep(context: ContextTypes.DEFAULT_TYPE):
     rows = c.fetchall()
 
     for chat_id, user_id, joined, last_media, w2h, w10m in rows:
-        joined_dt = datetime.fromisoformat(joined)
-        last_media_dt = datetime.fromisoformat(last_media) if last_media else None
+        ...
+        try:
+            await context.bot.ban_chat_member(chat_id, user_id)
+            await context.bot.unban_chat_member(chat_id, user_id)
+            await context.bot.send_message(chat_id, "❌ A user was removed for inactivity (no media posted).")
+        except:
+            pass
 
-        elapsed = now() - joined_dt
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
 
-        # Still in grace period
-        if elapsed < timedelta(hours=GRACE_HOURS):
-            remaining = timedelta(hours=GRACE_HOURS) - elapsed
+    app.add_handler(CommandHandler("ping", ping))
+    app.add_handler(ChatMemberHandler(on_member_update, ChatMemberHandler.CHAT_MEMBER))
+    app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO, on_media))
 
-            if remaining <= timedelta(hours=WARN_2H) and not w2h:
-                await context.bot.send_message(
-                    chat_id,
-                    f"⚠️ <a href='tg://user?id={user_id}'>Warning</a>: "
-                    f"Post a photo or video within **2 hours** or you’ll be removed.",
-                    parse_mode="HTML"
-                )
-                c.execute("UPDATE users SET warned_2h=1 WHERE chat_id=? AND user_id=?", (chat_id, user_id))
-                conn.commit()
+    app.job_queue.run_repeating(sweep, interval=300)
 
-            if remaining <= timedelta(minutes=WARN_10M) and not w10m:
-                await context.bot.send_message(
-                    chat_id,
-                    f"🚨 <a href='tg://user?id={user_id}'>Final warning</a>: "
-                    f"Post a photo or video in **10 minutes** or you will be removed.",
-                    parse_mode="HTML"
-                )
-                c.execute("UPDATE users SET warned_10m=1 WHERE chat_id=? AND user_id=?", (chat_id, user_id))
-                conn.commit()
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
-            continue
 
-        # After grace: enforce ongoing media rule
-        if (last_media_dt is None) or (now() - last_media_dt > timedelta(days=MEDIA_DAYS)):
-            try:
-                await context.bot.ban_chat_member(chat_id, user_id)
-                await context.bot.unban_chat_member(chat_id, user_id)
-                await context.bot.send_message(chat_id, "❌ A user was removed for inactivity (no media posted).")
-            except:
-                pass
-
-    def main():
-        app = ApplicationBuilder().token(TOKEN).build()
-
-        app.add_handler(CommandHandler("ping", ping))
-        app.add_handler(ChatMemberHandler(on_member_update, ChatMemberHandler.CHAT_MEMBER))
-        app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO, on_media))
-
-        # Run checks every 5 minutes
-        app.job_queue.run_repeating(sweep, interval=300)
-
-        # IMPORTANT: run_polling is NOT awaited
-        app.run_polling(allowed_updates=Update.ALL_TYPES)
-
-    if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+    main()
