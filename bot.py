@@ -39,8 +39,10 @@ def now():
     return datetime.utcnow()
 
 async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ I’m online and watching for photos/videos.")
-
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="✅ I’m online and watching for photos/videos."
+    )
 async def on_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Fires for member status changes. We'll treat "joined/added" as a join.
@@ -107,7 +109,8 @@ async def sweep(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id, "❌ A user was removed for inactivity (no media posted).")
         except:
             pass
-
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
+    print(f"Error: {context.error}")
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -116,6 +119,8 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO, on_media))
 
     app.job_queue.run_repeating(sweep, interval=300)
+
+    app.add_error_handler(on_error)    
 
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
