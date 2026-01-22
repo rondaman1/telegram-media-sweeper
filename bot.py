@@ -171,24 +171,40 @@ async def sweep(context: ContextTypes.DEFAULT_TYPE):
             continue
 
         # After grace: remove if still no media
-        if last_media_dt is None:
-            try:
-                await context.bot.ban_chat_member(chat_id, user_id)
-                await context.bot.unban_chat_member(chat_id, user_id)
-                await context.bot.send_message(chat_id, "❌ A user was removed for inactivity (no media posted).")
-            except Exception as e:
-                print(f"Kick failed: {e}")
-            continue
+if last_media_dt is None:
+    try:
+        await context.bot.ban_chat_member(chat_id, user_id)
+        await context.bot.unban_chat_member(chat_id, user_id)
+        await context.bot.send_message(chat_id, "❌ A user was removed for inactivity (no media posted).")
+    except Exception as e:
+        print(f"Kick failed: {e}")
+
+    
+    c.execute(
+        "DELETE FROM users WHERE chat_id=? AND user_id=?",
+        (chat_id, user_id)
+    )
+    conn.commit()
+
+    continue
 
         # Ongoing rule: must post media every MEDIA_DAYS
-        if now() - last_media_dt > timedelta(days=MEDIA_DAYS):
-            try:
-                await context.bot.ban_chat_member(chat_id, user_id)
-                await context.bot.unban_chat_member(chat_id, user_id)
-                await context.bot.send_message(chat_id, "❌ A user was removed for inactivity (no recent media posted).")
-            except Exception as e:
-                print(f"Kick failed: {e}")
+if now() - last_media_dt > timedelta(days=MEDIA_DAYS):
+    try:
+        await context.bot.ban_chat_member(chat_id, user_id)
+        await context.bot.unban_chat_member(chat_id, user_id)
+        await context.bot.send_message(chat_id, "❌ A user was removed for inactivity (no recent media posted).")
+    except Exception as e:
+        print(f"Kick failed: {e}")
 
+  
+    c.execute(
+        "DELETE FROM users WHERE chat_id=? AND user_id=?",
+        (chat_id, user_id)
+    )
+    conn.commit()
+
+    continue
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
