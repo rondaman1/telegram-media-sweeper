@@ -131,7 +131,7 @@ async def on_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
 
 
-# --- Periodic enforcement ---
+# --- Periodic enforcement ---async def sweep(context: ContextTypes.DEFAULT_TYPE):
 async def sweep(context: ContextTypes.DEFAULT_TYPE):
     c.execute("SELECT chat_id, user_id, joined_at, last_media_at, warned_2h, warned_10m FROM users")
     rows = c.fetchall()
@@ -142,16 +142,16 @@ async def sweep(context: ContextTypes.DEFAULT_TYPE):
 
         elapsed = now() - joined_dt
 
-        # Grace period enforcement (must post media within GRACE_HOURS)
+        # Still in grace period
         if elapsed < timedelta(hours=GRACE_HOURS):
             remaining = timedelta(hours=GRACE_HOURS) - elapsed
 
-            # 2-hour warning
+            # 2-hour warning (only if they haven't posted any media yet)
             if remaining <= timedelta(hours=WARN_2H) and not warned_2h and last_media_dt is None:
                 await context.bot.send_message(
                     chat_id,
                     f"⚠️ <a href='tg://user?id={user_id}'>Warning</a>: "
-                    f"Post a photo or video within **2 hours** or you’ll be removed.",
+                    f"Post a photo or video within 2 hours or you’ll be removed.",
                     parse_mode="HTML",
                 )
                 c.execute("UPDATE users SET warned_2h=1 WHERE chat_id=? AND user_id=?", (chat_id, user_id))
@@ -162,50 +162,40 @@ async def sweep(context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(
                     chat_id,
                     f"🚨 <a href='tg://user?id={user_id}'>Final warning</a>: "
-                    f"Post a photo or video in **10 minutes** or you will be removed.",
+                    f"Post a photo or video in 10 minutes or you will be removed.",
                     parse_mode="HTML",
                 )
                 c.execute("UPDATE users SET warned_10m=1 WHERE chat_id=? AND user_id=?", (chat_id, user_id))
                 conn.commit()
 
-            continue
+            continue  
 
         # After grace: remove if still no media
-if last_media_dt is None:
-    try:
-        await context.bot.ban_chat_member(chat_id, user_id)
-        await context.bot.unban_chat_member(chat_id, user_id)
-        await context.bot.send_message(chat_id, "❌ A user was removed for inactivity (no media posted).")
-    except Exception as e:
-        print(f"Kick failed: {e}")
+        if last_media_dt is None:
+            try:
+                await context.bot.ban_chat_member(chat_id, user_id)
+                await context.bot.unban_chat_member(chat_id, user_id)
+                await context.bot.send_message(chat_id, "❌ A user was removed for inactivity (no media posted).")
+            except Exception as e:
+                print(f"Kick failed: {e}")
 
-    
-    c.execute(
-        "DELETE FROM users WHERE chat_id=? AND user_id=?",
-        (chat_id, user_id)
-    )
-    conn.commit()
+            c.execute("DELETE FROM users WHERE chat_id=? AND user_id=?", (chat_id, user_id))
+            conn.commit()
+            continue
 
-    continue
+        # Ongoing rule: remove if inactive too long
+        if now() - last_media_dt > timedelta(days=MEDIA_DAYS):
+            try:
+                await context.bot.ban_chat_member(chat_id, user_id)
+                await context.bot.unban_chat_member(chat_id, user_id)
+                await context.bot.send_message(chat_id, "❌ A user was removed for inactivity (no recent media posted).")
+            except Exception as e:
+                print(f"Kick failed: {e}")
 
-        # Ongoing rule: must post media every MEDIA_DAYS
-if now() - last_media_dt > timedelta(days=MEDIA_DAYS):
-    try:
-        await context.bot.ban_chat_member(chat_id, user_id)
-        await context.bot.unban_chat_member(chat_id, user_id)
-        await context.bot.send_message(chat_id, "❌ A user was removed for inactivity (no recent media posted).")
-    except Exception as e:
-        print(f"Kick failed: {e}")
-
+            c.execute("DELETE FROM users WHERE chat_id=? AND user_id=?", (chat_id, user_id))
+            conn.commit()
+            continue
   
-    c.execute(
-        "DELETE FROM users WHERE chat_id=? AND user_id=?",
-        (chat_id, user_id)
-    )
-    conn.commit()
-
-    continue
-
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -229,7 +219,6 @@ def main():
     app.job_queue.run_repeating(sweep, interval=300)  # every 5 minutes
 
     app.run_polling(allowed_updates=Update.ALL_TYPES)
-
 
 if __name__ == "__main__":
     main()
